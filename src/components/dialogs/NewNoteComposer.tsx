@@ -1,0 +1,297 @@
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type FormEvent,
+    type KeyboardEvent as ReactKeyboardEvent,
+    type MouseEvent,
+} from "react";
+import {
+    ChevronDown,
+    Maximize2,
+    Pencil,
+    Pin,
+    PinOff,
+    Send,
+    Trash2,
+    X,
+    Minus,
+} from "lucide-react";
+import type { NoteFolder } from "../../types/note";
+import { EditorToolbar, type MarkdownAction } from "../editor/EditorToolbar";
+import { applyMarkdownAction } from "../editor/markdownFormatting";
+import { MarkdownPreview } from "../editor/MarkdownPreview";
+import { isMacOS } from "../../features/shortcuts/keyboardShortcuts";
+
+type NoteDraft = {
+    title: string;
+    body: string;
+    folder: string;
+    pinned: boolean;
+};
+
+export function NewNoteComposer({
+    folders,
+    onSave,
+    onClose,
+    onModalActiveChange,
+}: {
+    folders: NoteFolder[];
+    onSave: (draft: NoteDraft) => void;
+    onClose: () => void;
+    onModalActiveChange: (active: boolean) => void;
+}) {
+    const [title, setTitle] = useState("");
+    const [body, setBody] = useState("");
+    const [folder, setFolder] = useState("");
+    const [pinned, setPinned] = useState(false);
+    const [minimized, setMinimized] = useState(false);
+    const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+    const [preview, setPreview] = useState(false);
+    const bodyInputRef = useRef<HTMLTextAreaElement>(null);
+    const wordCount = useMemo(
+        () => (body.trim() ? body.trim().split(/\s+/).length : 0),
+        [body],
+    );
+
+    useEffect(() => {
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape" && !minimized) onClose();
+        };
+        window.addEventListener("keydown", handleEscape);
+        return () => window.removeEventListener("keydown", handleEscape);
+    }, [minimized, onClose]);
+
+    useEffect(() => {
+        const restoreDraft = () => {
+            setMinimized(false);
+            setFolderMenuOpen(false);
+            onModalActiveChange(true);
+        };
+        window.addEventListener("scribe:restore-note-draft", restoreDraft);
+        return () =>
+            window.removeEventListener("scribe:restore-note-draft", restoreDraft);
+    }, [onModalActiveChange]);
+
+    const submit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        onSave({ title, body, folder, pinned });
+    };
+
+    const minimizeOnBackdrop = (event: MouseEvent<HTMLDivElement>) => {
+        event.stopPropagation();
+        if (event.target === event.currentTarget) {
+            setFolderMenuOpen(false);
+            setMinimized(true);
+            onModalActiveChange(false);
+        }
+    };
+    const toggleMinimized = () => {
+        onModalActiveChange(minimized);
+        setMinimized(!minimized);
+    };
+    const applyAction = (action: MarkdownAction) =>
+        applyMarkdownAction(bodyInputRef.current, body, action, setBody);
+    const handleFormattingKeyDown = (
+        event: ReactKeyboardEvent<HTMLTextAreaElement>,
+    ) => {
+        if (!(isMacOS() ? event.metaKey : event.ctrlKey)) return;
+        const key = event.key.toLowerCase();
+        const action: MarkdownAction | null =
+            !event.altKey && !event.shiftKey && key === "b"
+                ? "bold"
+                : !event.altKey && !event.shiftKey && key === "i"
+                    ? "italic"
+                    : !event.altKey && !event.shiftKey && key === "k"
+                        ? "link"
+                        : event.altKey && !event.shiftKey && key === "1"
+                            ? "heading1"
+                            : event.altKey && !event.shiftKey && key === "2"
+                                ? "heading2"
+                                : null;
+        if (!action) return;
+        event.preventDefault();
+        applyAction(action);
+    };
+
+    return (
+        <div
+            className={`compose-layer ${minimized ? "is-minimized" : ""}`}
+            onClick={minimizeOnBackdrop}
+            onDoubleClick={(event) => event.stopPropagation()}
+        >
+            <form
+                className="composer-window"
+                onSubmit={submit}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Create a note"
+            >
+                <header className="composer-header">
+                    <div className="composer-heading">
+                        <span className="composer-mark">
+                            <Pencil size={14} />
+                        </span>
+                        <div>
+                            <strong>
+                                {minimized
+                                    ? `Draft: ${title.trim() || "No title"}`
+                                    : "New note"}
+                            </strong>
+                            <span>{folder ? `In ${folder}` : "A new thought"}</span>
+                        </div>
+                    </div>
+                    <div className="composer-window-actions">
+                        <button
+                            type="button"
+                            className="composer-control"
+                            onClick={toggleMinimized}
+                            aria-label={minimized ? "Restore draft" : "Minimize draft"}
+                            data-tooltip={minimized ? "Restore draft" : "Minimize draft"}
+                        >
+                            {minimized ? <Maximize2 size={13} /> : <Minus size={14} />}
+                        </button>
+                        <button
+                            type="button"
+                            className="composer-control composer-close"
+                            onClick={onClose}
+                            aria-label="Discard draft"
+                            data-tooltip="Discard draft"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                </header>
+
+                <div className="composer-body">
+                    <div className="composer-folder-row">
+                        <label>Folder</label>
+                        <div className="composer-folder-picker">
+                            <button
+                                type="button"
+                                className={`composer-folder-trigger ${folderMenuOpen ? "is-open" : ""}`}
+                                aria-haspopup="listbox"
+                                aria-expanded={folderMenuOpen}
+                                onClick={() => setFolderMenuOpen((value) => !value)}
+                            >
+                                <span>{folder || "No folder"}</span>
+                                <ChevronDown size={14} />
+                            </button>
+                            {folderMenuOpen && (
+                                <>
+                                    <button
+                                        className="composer-menu-dismiss"
+                                        type="button"
+                                        aria-label="Close folder menu"
+                                        onClick={() => setFolderMenuOpen(false)}
+                                    />
+                                    <div
+                                        className="composer-folder-menu"
+                                        role="listbox"
+                                        aria-label="Choose folder"
+                                    >
+                                        <button
+                                            type="button"
+                                            role="option"
+                                            aria-selected={!folder}
+                                            className={!folder ? "is-selected" : ""}
+                                            onClick={() => {
+                                                setFolder("");
+                                                setFolderMenuOpen(false);
+                                            }}
+                                        >
+                                            No folder
+                                        </button>
+                                        {folders.map((item) => (
+                                            <button
+                                                key={item.name}
+                                                type="button"
+                                                role="option"
+                                                aria-selected={folder === item.name}
+                                                className={folder === item.name ? "is-selected" : ""}
+                                                onClick={() => {
+                                                    setFolder(item.name);
+                                                    setFolderMenuOpen(false);
+                                                }}
+                                            >
+                                                {item.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    <input
+                        className="composer-title-input"
+                        autoFocus
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        placeholder="Give your note a title"
+                        aria-label="Note title"
+                    />
+                    <EditorToolbar
+                        className="composer-format-toolbar"
+                        preview={preview}
+                        onTogglePreview={() => setPreview((value) => !value)}
+                        onAction={applyAction}
+                    />
+                    {preview ? (
+                        <div className="composer-content-preview">
+                            <MarkdownPreview value={body} />
+                        </div>
+                    ) : (
+                        <textarea
+                            ref={bodyInputRef}
+                            className="composer-content-input"
+                            value={body}
+                            onChange={(event) => setBody(event.target.value)}
+                            onKeyDown={handleFormattingKeyDown}
+                            placeholder="Start writing..."
+                            aria-label="Note content (Markdown)"
+                            spellCheck
+                        />
+                    )}
+                </div>
+
+                <footer className="composer-footer">
+                    <div className="composer-footer-meta">
+                        <button
+                            type="button"
+                            className={`composer-pin ${pinned ? "is-pinned" : ""}`}
+                            onClick={() => setPinned((value) => !value)}
+                            data-tooltip={pinned ? "Unpin after saving" : "Pin after saving"}
+                        >
+                            {pinned ? <Pin size={14} /> : <PinOff size={14} />}
+                            <span>{pinned ? "Pinned" : "Pin note"}</span>
+                        </button>
+                        <span className="composer-count">
+                            {wordCount} {wordCount === 1 ? "word" : "words"} <i />{" "}
+                            {body.length} characters
+                        </span>
+                    </div>
+                    <div className="composer-footer-actions">
+                        <button
+                            type="button"
+                            className="composer-discard"
+                            onClick={onClose}
+                            data-tooltip="Discard this draft"
+                        >
+                            <Trash2 size={15} />
+                            <span>Discard</span>
+                        </button>
+                        <button
+                            type="submit"
+                            className="composer-save"
+                            data-tooltip="Save note"
+                        >
+                            <span>Save note</span>
+                            <Send size={14} />
+                        </button>
+                    </div>
+                </footer>
+            </form>
+        </div>
+    );
+}

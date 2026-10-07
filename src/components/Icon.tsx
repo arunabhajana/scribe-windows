@@ -1,0 +1,101 @@
+import {
+  ArrowLeft,
+  Bell,
+  Bold,
+  BookOpen,
+  BriefcaseBusiness,
+  Check,
+  ChevronDown,
+  Clock3,
+  Code2,
+  Database,
+  Download,
+  FileText,
+  Folder,
+  Heart,
+  Info,
+  Italic,
+  Keyboard,
+  Lightbulb,
+  List,
+  ListOrdered,
+  LogOut,
+  Moon,
+  Music2,
+  Palette,
+  Pin,
+  Plane,
+  Plus,
+  Redo2,
+  RotateCcw,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Star,
+  Sun,
+  Trash2,
+  UserRound,
+  Undo2,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const iconMap = {
+  note: FileText,
+  search: Search,
+  pin: Pin,
+  trash: Trash2,
+  plus: Plus,
+  sun: Sun,
+  moon: Moon,
+  folder: Folder,
+  settings: Settings2,
+  database: Database,
+  general: SlidersHorizontal,
+  appearance: Palette,
+  notifications: Bell,
+  shortcuts: Keyboard,
+  storage: Database,
+  about: Info,
+  info: Info,
+  logout: LogOut,
+  profile: UserRound,
+  check: Check,
+  download: Download,
+  reset: RotateCcw,
+  bold: Bold,
+  italic: Italic,
+  undo: Undo2,
+  redo: Redo2,
+  list: List,
+  numbered: ListOrdered,
+  close: X,
+  clock: Clock3,
+  arrowLeft: ArrowLeft,
+  chevronDown: ChevronDown,
+  briefcase: BriefcaseBusiness,
+  book: BookOpen,
+  code: Code2,
+  heart: Heart,
+  idea: Lightbulb,
+  music: Music2,
+  travel: Plane,
+  star: Star,
+} satisfies Record<string, LucideIcon>;
+
+export type IconName = keyof typeof iconMap;
+
+export function Icon({
+  name,
+  size = 16,
+  strokeWidth = 1.8,
+}: {
+  name: IconName;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  const IconComponent = iconMap[name];
+  return (
+    <IconComponent size={size} strokeWidth={strokeWidth} aria-hidden="true" />
+  );
+}
