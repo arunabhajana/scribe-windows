@@ -7,7 +7,9 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { useNotes } from "./hooks/useNotes";
 import type { Note } from "./types/note";
 import { SettingsPage } from "./components/settings/SettingsPage";
-import { SignedOutScreen } from "./components/settings/SignedOutScreen";
+import { AuthPage } from "./components/auth/AuthPage";
+import { useAuth } from "./hooks/useAuth";
+import { profileFromUser } from "./features/auth/accountProfile";
 import type { AccentColor } from "./features/settings/accentColors";
 import { accentColors } from "./features/settings/accentColors";
 import { TitleBar } from "./components/layout/TitleBar";
@@ -21,10 +23,11 @@ import {
   type ShortcutBindings,
 } from "./features/shortcuts/keyboardShortcuts";
 
-type AppPage = "notes" | "preferences" | "signed-out";
+type AppPage = "notes" | "preferences";
 
 function App() {
   const notesState = useNotes();
+  const auth = useAuth();
   const [isDark, setIsDark] = useState(true);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -38,6 +41,7 @@ function App() {
   const [accent, setAccent] = useState<AccentColor>(
     () => (localStorage.getItem("scribe-accent") as AccentColor) || "violet",
   );
+
   const storageMetrics = useMemo(() => {
     const bytes = (value: unknown) =>
       new TextEncoder().encode(JSON.stringify(value)).length;
@@ -88,6 +92,7 @@ function App() {
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (
+        !auth.user ||
         page !== "notes" ||
         isComposerModalActive ||
         event.defaultPrevented ||
@@ -131,6 +136,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [
     isComposerModalActive,
+    auth.user,
     notesState,
     openNewNote,
     page,
@@ -147,19 +153,40 @@ function App() {
     notesState.setSelectedId(null);
   };
 
-  if (page === "signed-out")
+  if (auth.loading)
+    return (
+      <div className={`desktop-frame ${isDark ? "theme-dark" : "theme-light"}`}>
+        <TitleBar dark={isDark} onToggleTheme={() => setIsDark((value) => !value)} />
+        <main className="auth-screen auth-loading" aria-label="Restoring session">
+          <span className="auth-online-dot" />
+          <span>Restoring your session…</span>
+        </main>
+      </div>
+    );
+
+  if (!auth.user)
     return (
       <div
-        className="desktop-frame"
+        className={`desktop-frame ${isDark ? "theme-dark" : "theme-light"}`}
         style={
-          { "--accent": accentColors[accent].color } as React.CSSProperties
+          {
+            "--accent": accentColors.violet.color,
+            "--accent-soft": `color-mix(in srgb, ${accentColors.violet.color} 18%, transparent)`,
+          } as React.CSSProperties
         }
       >
         <TitleBar
           dark={isDark}
           onToggleTheme={() => setIsDark((value) => !value)}
         />
-        <SignedOutScreen onReturn={() => setPage("notes")} />
+        <AuthPage
+          configured={auth.configured}
+          onSignIn={auth.signInWithPassword}
+          onSignUp={auth.signUpWithPassword}
+          callbackError={auth.authCallbackError}
+          notice={auth.authNotice}
+          onAuthenticated={() => setPage("notes")}
+        />
       </div>
     );
   if (page === "preferences")
@@ -183,6 +210,7 @@ function App() {
           shortcuts={shortcuts}
           onShortcutsChange={changeShortcuts}
           storageMetrics={storageMetrics}
+          profile={profileFromUser(auth.user)}
         />
       </div>
     );
@@ -220,11 +248,15 @@ function App() {
           onSelectFolder={notesState.selectFolder}
           onCreateFolder={() => setIsCreateFolderOpen(true)}
           onOpenPreferences={() => setPage("preferences")}
-          onLogout={() => setPage("signed-out")}
+          onLogout={async () => {
+            await auth.signOut();
+            notesState.resetDemoData();
+          }}
           collapsed={sidebarCollapsed}
           onToggleCollapsed={toggleSidebar}
           onExpandSidebar={() => setSidebarCollapsed(false)}
           shortcuts={shortcuts}
+          profile={profileFromUser(auth.user)}
         />
         <NotesPane
           notes={notesState.visibleNotes}

@@ -47,10 +47,17 @@ export function TitleBar({
     void getCurrentWindow().toggleMaximize();
   };
 
+  const startWindowDrag = (event: React.MouseEvent<HTMLElement>) => {
+    if (!desktop || inert || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button")) return;
+    void getCurrentWindow().startDragging();
+  };
+
   return (
     <header
       className="titlebar"
       data-tauri-drag-region
+      onMouseDown={startWindowDrag}
       onDoubleClick={toggleMaximize}
       inert={inert}
     >

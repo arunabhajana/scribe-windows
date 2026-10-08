@@ -17,6 +17,15 @@ export function useNotes() {
   const [search, setSearch] = useState("");
   const [folders, setFolders] = useState<NoteFolder[]>(mockFolders);
 
+  const resetDemoData = () => {
+    setNotes(mockNotes);
+    setFolders(mockFolders);
+    setSelectedId(1);
+    setSection("all");
+    setFolder("");
+    setSearch("");
+  };
+
   const selectedNote =
     notes.find((note) => note.id === selectedId && !note.trashed) ?? null;
   const visibleNotes = useMemo(
@@ -119,5 +128,6 @@ export function useNotes() {
     createFolder,
     selectSection,
     selectFolder,
+    resetDemoData,
   };
 }

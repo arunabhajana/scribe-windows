@@ -7,6 +7,7 @@ import { BrandHeader } from "../navigation/BrandHeader";
 import { ProfileBar } from "../profile/ProfileMenu";
 import type { ShortcutBindings } from "../../features/shortcuts/keyboardShortcuts";
 import { formatShortcut } from "../../features/shortcuts/keyboardShortcuts";
+import type { AccountProfile } from "../../features/auth/accountProfile";
 
 type SidebarProps = {
   section: NoteSection;
@@ -24,6 +25,7 @@ type SidebarProps = {
   onToggleCollapsed: () => void;
   onExpandSidebar: () => void;
   shortcuts: ShortcutBindings;
+  profile: AccountProfile;
 };
 
 export function Sidebar(props: SidebarProps) {
@@ -57,6 +59,7 @@ export function Sidebar(props: SidebarProps) {
       </div>
       <ProfileBar
         collapsed={props.collapsed}
+        profile={props.profile}
         onOpenPreferences={props.onOpenPreferences}
         onLogout={props.onLogout}
       />

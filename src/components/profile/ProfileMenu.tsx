@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../Icon";
+import type { AccountProfile } from "../../features/auth/accountProfile";
 
 export function ProfileMenu({
   onOpenPreferences,
   onLogout,
   collapsed,
+  profile,
 }: {
   onOpenPreferences: () => void;
   onLogout: () => void;
   collapsed: boolean;
+  profile: AccountProfile;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const initials = profile.displayName.trim().charAt(0).toUpperCase() || "A";
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +44,7 @@ export function ProfileMenu({
         onClick={() => setOpen((value) => !value)}
       >
         {collapsed ? (
-          <span className="avatar">A</span>
+          <span className="avatar">{initials}</span>
         ) : (
           <span className="profile-menu-dots" aria-hidden="true">
             ···
@@ -53,10 +57,10 @@ export function ProfileMenu({
           role="menu"
         >
           <div className="profile-popover-user">
-            <div className="avatar">A</div>
+            <div className="avatar">{initials}</div>
             <div>
-              <strong>Alex Morgan</strong>
-              <span>Local account</span>
+              <strong>{profile.displayName}</strong>
+              <span>{profile.email}</span>
             </div>
           </div>
           <div className="profile-popover-divider" />
@@ -90,20 +94,24 @@ export function ProfileBar({
   onOpenPreferences,
   onLogout,
   collapsed,
+  profile,
 }: {
   onOpenPreferences: () => void;
   onLogout: () => void;
   collapsed: boolean;
+  profile: AccountProfile;
 }) {
+  const initials = profile.displayName.trim().charAt(0).toUpperCase() || "A";
   return (
     <div className={`profile-row ${collapsed ? "is-collapsed" : ""}`}>
-      <div className="avatar profile-avatar">A</div>
+      <div className="avatar profile-avatar">{initials}</div>
       <div className="profile-copy">
-        <span className="profile-name">Alex Morgan</span>
-        <span className="profile-plan">Local profile</span>
+        <span className="profile-name">{profile.displayName}</span>
+        <span className="profile-plan">{profile.email}</span>
       </div>
       <ProfileMenu
         collapsed={collapsed}
+        profile={profile}
         onOpenPreferences={onOpenPreferences}
         onLogout={onLogout}
       />

@@ -26,6 +26,7 @@ import {
   type ShortcutBindings,
   type ShortcutId,
 } from "../../features/shortcuts/keyboardShortcuts";
+import type { AccountProfile } from "../../features/auth/accountProfile";
 
 type Category = {
   id: string;
@@ -397,7 +398,7 @@ function AccountSettingRow({
       <button
         type="button"
         disabled
-        title={`${action} will be available when accounts are connected`}
+        title={`${action} is not available yet`}
       >
         {action}
         <ChevronRight size={15} />
@@ -529,49 +530,50 @@ function StorageSettings({ metrics }: { metrics: StorageMetrics }) {
   );
 }
 
-function AccountSettings() {
+function AccountSettings({ profile }: { profile: AccountProfile }) {
+  const initials = profile.displayName.trim().charAt(0).toUpperCase() || "A";
   return (
     <>
       <SettingCard
         title="Your profile"
-        description="The information and photo people will see when account sharing is available."
+        description="Your account details from Supabase."
         accent="pink"
         id={settingId("Profile photo")}
       >
         <div className="account-profile-card">
           <div className="account-profile-avatar">
-            A
+            {initials}
             <button
               type="button"
               disabled
               aria-label="Change profile photo"
-              title="Profile photos will be available when accounts are connected"
+              title="Profile photos are not available yet"
             >
               <Camera size={14} />
             </button>
           </div>
           <div className="account-profile-copy">
-            <strong>Alex Morgan</strong>
-            <span>Local profile · accounts coming later</span>
+            <strong>{profile.displayName}</strong>
+            <span>{profile.email}</span>
           </div>
           <span className="coming-soon-badge">Preview</span>
         </div>
         <AccountSettingRow
           id="Display name"
           label="Display name"
-          detail="Alex Morgan"
-          action="Edit"
+          detail={profile.displayName}
+          action="Managed soon"
         />
         <AccountSettingRow
           id="Email address"
           label="Email address"
-          detail="alex@example.com"
-          action="Manage"
+          detail={profile.email}
+          action="Supabase"
         />
       </SettingCard>
       <SettingCard
         title="Password & security"
-        description="Account sign-in and recovery controls will be connected with authentication."
+        description="Supabase protects sign-in and email verification. Additional account controls are planned."
         accent="blue"
         id={settingId("Password & security")}
       >
@@ -580,8 +582,8 @@ function AccountSettings() {
             <ShieldCheck size={18} />
           </span>
           <div>
-            <strong>Account security is not connected yet</strong>
-            <small>Your current notes are stored in this local preview.</small>
+            <strong>Email and password sign-in is active</strong>
+            <small>Your session stays in this app’s local storage on this device. Sign out to remove it.</small>
           </div>
         </div>
         <AccountSettingRow
@@ -757,6 +759,7 @@ function CategoryContent({
   shortcuts,
   onShortcutsChange,
   storageMetrics,
+  profile,
 }: {
   category: Category;
   dark: boolean;
@@ -766,6 +769,7 @@ function CategoryContent({
   shortcuts: ShortcutBindings;
   onShortcutsChange: (value: ShortcutBindings) => void;
   storageMetrics: StorageMetrics;
+  profile: AccountProfile;
 }) {
   const [toggles, setToggles] = useState({
     launch: true,
@@ -825,7 +829,7 @@ function CategoryContent({
         </>
       );
     case "account":
-      return <AccountSettings />;
+      return <AccountSettings profile={profile} />;
     case "appearance":
       return (
         <>
@@ -1081,6 +1085,7 @@ export function SettingsPage({
   shortcuts,
   onShortcutsChange,
   storageMetrics,
+  profile,
 }: {
   dark: boolean;
   accent: AccentColor;
@@ -1090,6 +1095,7 @@ export function SettingsPage({
   shortcuts: ShortcutBindings;
   onShortcutsChange: (value: ShortcutBindings) => void;
   storageMetrics: StorageMetrics;
+  profile: AccountProfile;
 }) {
   const [categoryId, setCategoryId] = useState("general");
   const [query, setQuery] = useState("");
@@ -1261,6 +1267,7 @@ export function SettingsPage({
               shortcuts={shortcuts}
               onShortcutsChange={onShortcutsChange}
               storageMetrics={storageMetrics}
+              profile={profile}
             />
           )}
         </div>
