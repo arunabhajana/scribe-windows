@@ -15,28 +15,36 @@ export function NotesPane({
   section,
   folder,
   search,
+  onSaveDraft,
   onSelectNote,
   onTogglePinned,
   onCreateNote,
   shortcuts,
+  syncStatus,
 }: {
   notes: Note[];
   folders: NoteFolder[];
-  selectedId: number | null;
+  selectedId: string | null;
   section: NoteSection;
   folder: string;
   search: string;
-  onSelectNote: (id: number) => void;
-  onTogglePinned: (id: number) => void;
+  onSaveDraft: (id: string) => void;
+  onSelectNote: (id: string) => void;
+  onTogglePinned: (id: string) => void;
   onCreateNote: () => void;
   shortcuts: ShortcutBindings;
+  syncStatus: "on-device" | "syncing" | "synced" | "offline" | "error";
 }) {
   const title =
-    section === "pinned"
-      ? "Pinned Notes"
-      : section === "trash"
-        ? "Trash"
-        : folder || "All Notes";
+    section === "drafts"
+      ? "Drafts"
+      : section === "unfiled"
+        ? "Unfiled"
+        : section === "pinned"
+          ? "Pinned Notes"
+          : section === "trash"
+            ? "Trash"
+            : folder || "All Notes";
   return (
     <section className="notes-pane">
       <header className="pane-header">
@@ -68,9 +76,12 @@ export function NotesPane({
             <NoteCard
               key={note.id}
               note={note}
-              folderConfig={folders.find((item) => item.name === note.folder)}
+              folderConfig={folders.find((item) => item.id === note.folderId)}
               selected={selectedId === note.id}
-              onSelect={() => onSelectNote(note.id)}
+              onSelect={() => {
+                if (note.isDraft && !note.deletedAt) onSaveDraft(note.id);
+                onSelectNote(note.id);
+              }}
               onTogglePinned={() => onTogglePinned(note.id)}
             />
           ))
@@ -78,7 +89,16 @@ export function NotesPane({
       </div>
       <footer className="list-footer">
         <span>
-          <Icon name="clock" size={13} /> Synced just now
+          <Icon name="clock" size={13} />{" "}
+          {syncStatus === "syncing"
+            ? "Syncing…"
+            : syncStatus === "synced"
+              ? "Synced"
+              : syncStatus === "offline"
+                ? "Offline"
+                : syncStatus === "error"
+                  ? "Sync issue"
+                  : "On this device"}
         </span>
         <span title="Search notes">{formatShortcut(shortcuts.search)}</span>
       </footer>

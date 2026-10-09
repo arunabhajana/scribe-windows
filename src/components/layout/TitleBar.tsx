@@ -9,6 +9,8 @@ import {
   Square,
   Sun,
   X,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 export function TitleBar({
@@ -17,12 +19,18 @@ export function TitleBar({
   onToggleTheme,
   inert,
   settingsShortcut,
+  syncStatus = "on-device",
+  offlineMode = false,
+  onToggleOfflineMode,
 }: {
   onOpenSettings?: () => void;
   dark?: boolean;
   onToggleTheme?: () => void;
   inert?: boolean;
   settingsShortcut?: string;
+  syncStatus?: "on-device" | "syncing" | "synced" | "offline" | "error";
+  offlineMode?: boolean;
+  onToggleOfflineMode?: () => void;
 }) {
   const [maximized, setMaximized] = useState(false);
   const desktop = isTauri();
@@ -62,13 +70,43 @@ export function TitleBar({
       inert={inert}
     >
       <div className="titlebar-leading" data-tauri-drag-region>
-        <span className="titlebar-status-dot" />
-        <span>On this device</span>
+        <span className={`titlebar-status-dot status-${syncStatus}`} />
+        <span
+          key={syncStatus}
+          className={`titlebar-sync-label status-${syncStatus}`}
+        >
+          {syncStatus === "syncing"
+            ? "Syncing…"
+            : syncStatus === "synced"
+              ? "Synced"
+              : syncStatus === "offline"
+                ? "Offline"
+                : syncStatus === "error"
+                  ? "Sync issue"
+                  : "On this device"}
+        </span>
       </div>
       <div className="titlebar-title" data-tauri-drag-region>
         Scribe
       </div>
       <div className="titlebar-trailing">
+        {onToggleOfflineMode && (
+          <button
+            className={`titlebar-action offline-mode-toggle ${offlineMode ? "is-offline" : ""}`}
+            onClick={onToggleOfflineMode}
+            aria-label={
+              offlineMode ? "Turn off Offline Mode" : "Turn on Offline Mode"
+            }
+            aria-pressed={offlineMode}
+            title={
+              offlineMode
+                ? "Offline Mode is on. Queue changes locally."
+                : "Offline Mode is off. Sync when changes are ready."
+            }
+          >
+            {offlineMode ? <WifiOff size={14} /> : <Wifi size={14} />}
+          </button>
+        )}
         {onToggleTheme && (
           <button
             className="titlebar-action theme-titlebar-action"

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Camera,
   Check,
   ChevronDown,
@@ -7,11 +9,15 @@ import {
   Database,
   FileText,
   Folder,
+  Pencil,
+  Plus,
   HardDrive,
   ShieldCheck,
   Smartphone,
+  Trash2,
 } from "lucide-react";
 import { Icon, type IconName } from "../Icon";
+import { CreateFolderDialog } from "../dialogs/CreateFolderDialog";
 import {
   accentColors,
   type AccentColor,
@@ -27,6 +33,7 @@ import {
   type ShortcutId,
 } from "../../features/shortcuts/keyboardShortcuts";
 import type { AccountProfile } from "../../features/auth/accountProfile";
+import type { Note, NoteFolder } from "../../types/note";
 
 type Category = {
   id: string;
@@ -49,6 +56,13 @@ const categories: Category[] = [
     icon: "profile",
     color: "pink",
     description: "Manage your profile and account security.",
+  },
+  {
+    id: "folders",
+    label: "Folders",
+    icon: "folder",
+    color: "amber",
+    description: "Arrange, rename, and customize your note folders.",
   },
   {
     id: "appearance",
@@ -183,6 +197,13 @@ const settingSearchIndex = [
     detail: "View estimated space used by notes and settings.",
     category: "storage",
     terms: "space disk usage data files",
+  },
+  {
+    label: "Folder organization",
+    detail: "Reorder, rename, recolor, or delete your folders.",
+    category: "folders",
+    terms: "folders organize reorder rearrange rename edit delete icon color",
+    targetId: "setting-manage-folders",
   },
   {
     label: "Profile photo",
@@ -395,11 +416,7 @@ function AccountSettingRow({
         <strong>{label}</strong>
         <span>{detail}</span>
       </div>
-      <button
-        type="button"
-        disabled
-        title={`${action} is not available yet`}
-      >
+      <button type="button" disabled title={`${action} is not available yet`}>
         {action}
         <ChevronRight size={15} />
       </button>
@@ -583,7 +600,10 @@ function AccountSettings({ profile }: { profile: AccountProfile }) {
           </span>
           <div>
             <strong>Email and password sign-in is active</strong>
-            <small>Your session stays in this app’s local storage on this device. Sign out to remove it.</small>
+            <small>
+              Your session stays in this app’s local storage on this device.
+              Sign out to remove it.
+            </small>
           </div>
         </div>
         <AccountSettingRow
@@ -750,26 +770,283 @@ function KeyboardShortcutSettings({
   );
 }
 
+function FolderManagementSettings({
+  folders,
+  notes,
+  onCreateFolder,
+  onEditFolder,
+  onDeleteFolder,
+  onMoveFolder,
+  onMoveSystemFolder,
+  unfiledPosition,
+}: {
+  folders: NoteFolder[];
+  notes: Note[];
+  onCreateFolder: (
+    name: string,
+    icon: NoteFolder["icon"],
+    color: NoteFolder["color"],
+  ) => boolean;
+  onEditFolder: (
+    currentId: string,
+    name: string,
+    icon: NoteFolder["icon"],
+    color: NoteFolder["color"],
+  ) => boolean;
+  onDeleteFolder: (id: string) => void;
+  onMoveFolder: (id: string, offset: -1 | 1) => void;
+  onMoveSystemFolder: (offset: -1 | 1) => void;
+  unfiledPosition: number;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<NoteFolder | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const systemFolderOrder = Math.max(
+    0,
+    Math.min(folders.length, unfiledPosition),
+  );
+
+  return (
+    <>
+      <SettingCard
+        title="Your folders"
+        description="Arrange the folders in your sidebar and update their name, icon, or color. Deleting a folder keeps its notes and moves them to All Notes."
+        accent="amber"
+        id="setting-manage-folders"
+      >
+        <div className="folder-settings-toolbar">
+          <span>
+            {folders.length + 1} {folders.length === 0 ? "folder" : "folders"}
+          </span>
+          <button type="button" onClick={() => setCreating(true)}>
+            <Plus size={14} /> New folder
+          </button>
+        </div>
+        <div className="folder-settings-list">
+          {Array.from({ length: folders.length + 1 }, (_, position) => {
+            const systemPosition = systemFolderOrder;
+            if (position === systemPosition)
+              return (
+                <div
+                  className="folder-settings-entry system-folder-entry"
+                  key="system:unfiled"
+                >
+                  <div className="folder-settings-row">
+                    <span className="folder-settings-icon folder-tone-blue">
+                      <Icon name="folder" size={16} />
+                    </span>
+                    <div className="folder-settings-copy">
+                      <strong>Unfiled</strong>
+                      <span>
+                        System folder ·{" "}
+                        {
+                          notes.filter(
+                            (note) => !note.deletedAt && note.folderId === null,
+                          ).length
+                        }{" "}
+                        notes
+                      </span>
+                    </div>
+                    <div className="folder-settings-actions">
+                      <div
+                        className="folder-order-actions"
+                        aria-label="Reorder Unfiled"
+                      >
+                        <button
+                          type="button"
+                          aria-label="Move Unfiled up"
+                          disabled={systemPosition === 0}
+                          onClick={() => onMoveSystemFolder(-1)}
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Move Unfiled down"
+                          disabled={systemPosition === folders.length}
+                          onClick={() => onMoveSystemFolder(1)}
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                      </div>
+                      <span className="system-folder-lock">System</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            const folderIndex =
+              position < systemPosition ? position : position - 1;
+            const folder = folders[folderIndex];
+            if (!folder) return null;
+            {
+              const noteCount = notes.filter(
+                (note) => !note.deletedAt && note.folderId === folder.id,
+              ).length;
+              return (
+                <div className="folder-settings-entry" key={folder.id}>
+                  <div className="folder-settings-row">
+                    <span
+                      className={`folder-settings-icon folder-tone-${folder.color}`}
+                    >
+                      <Icon name={folder.icon} size={16} />
+                    </span>
+                    <div className="folder-settings-copy">
+                      <strong>{folder.name}</strong>
+                      <span>
+                        {noteCount} {noteCount === 1 ? "note" : "notes"}
+                      </span>
+                    </div>
+                    <div className="folder-settings-actions">
+                      <div
+                        className="folder-order-actions"
+                        aria-label={`Reorder ${folder.name}`}
+                      >
+                        <button
+                          type="button"
+                          aria-label={`Move ${folder.name} up`}
+                          title="Move up"
+                          data-tooltip="Move folder up"
+                          disabled={position === 0}
+                          onClick={() => onMoveFolder(folder.id, -1)}
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Move ${folder.name} down`}
+                          title="Move down"
+                          data-tooltip="Move folder down"
+                          disabled={position === folders.length}
+                          onClick={() => onMoveFolder(folder.id, 1)}
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="folder-edit-action"
+                        aria-label={`Edit ${folder.name}`}
+                        title={`Edit ${folder.name}`}
+                        data-tooltip={`Edit ${folder.name}`}
+                        onClick={() => setEditingFolder(folder)}
+                      >
+                        <Pencil size={13} /> <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="folder-delete-action"
+                        aria-label={`Delete ${folder.name}`}
+                        title={`Delete ${folder.name}`}
+                        data-tooltip={`Delete ${folder.name}`}
+                        onClick={() => setPendingDelete(folder.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  {pendingDelete === folder.id && (
+                    <div
+                      className="folder-delete-confirm"
+                      role="group"
+                      aria-label={`Confirm deleting ${folder.name}`}
+                    >
+                      <span>
+                        Delete “{folder.name}”? Its notes will stay in All
+                        Notes.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(null)}
+                      >
+                        Keep folder
+                      </button>
+                      <button
+                        type="button"
+                        className="confirm-delete"
+                        onClick={() => {
+                          onDeleteFolder(folder.id);
+                          setPendingDelete(null);
+                        }}
+                      >
+                        Delete folder
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+          })}
+        </div>
+      </SettingCard>
+      {(creating || editingFolder) && (
+        <CreateFolderDialog
+          key={editingFolder?.name ?? "new-folder"}
+          folder={editingFolder ?? undefined}
+          onClose={() => {
+            setCreating(false);
+            setEditingFolder(null);
+          }}
+          onCreate={onCreateFolder}
+          onEdit={onEditFolder}
+        />
+      )}
+    </>
+  );
+}
+
 function CategoryContent({
   category,
   dark,
   setDark,
   accent,
   onAccentChange,
+  fontFamily,
+  onFontFamilyChange,
   shortcuts,
   onShortcutsChange,
+  offlineMode,
+  onOfflineModeChange,
   storageMetrics,
   profile,
+  folders,
+  notes,
+  onCreateFolder,
+  onEditFolder,
+  onDeleteFolder,
+  onMoveFolder,
+  onMoveSystemFolder,
+  unfiledPosition,
 }: {
   category: Category;
   dark: boolean;
   setDark: (value: boolean) => void;
   accent: AccentColor;
   onAccentChange: (value: AccentColor) => void;
+  fontFamily: string;
+  onFontFamilyChange: (value: string) => void;
   shortcuts: ShortcutBindings;
   onShortcutsChange: (value: ShortcutBindings) => void;
+  offlineMode: boolean;
+  onOfflineModeChange: (enabled: boolean) => void;
   storageMetrics: StorageMetrics;
   profile: AccountProfile;
+  folders: NoteFolder[];
+  notes: Note[];
+  onCreateFolder: (
+    name: string,
+    icon: NoteFolder["icon"],
+    color: NoteFolder["color"],
+  ) => boolean;
+  onEditFolder: (
+    currentId: string,
+    name: string,
+    icon: NoteFolder["icon"],
+    color: NoteFolder["color"],
+  ) => boolean;
+  onDeleteFolder: (id: string) => void;
+  onMoveFolder: (id: string, offset: -1 | 1) => void;
+  onMoveSystemFolder: (offset: -1 | 1) => void;
+  unfiledPosition: number;
 }) {
   const [toggles, setToggles] = useState({
     launch: true,
@@ -780,7 +1057,7 @@ function CategoryContent({
     sounds: false,
   });
   const [values, setValues] = useState({
-    font: "DM Sans",
+    font: fontFamily,
     size: "Medium",
     autosave: "Immediately",
   });
@@ -802,6 +1079,13 @@ function CategoryContent({
               detail="Open Scribe when you sign in to your computer."
               checked={toggles.launch}
               onChange={toggle("launch")}
+              color="blue"
+            />
+            <SettingToggle
+              label="Offline mode"
+              detail="Keep changes on this device and pause cloud sync until you turn this off."
+              checked={offlineMode}
+              onChange={onOfflineModeChange}
               color="blue"
             />
             <SettingSelect
@@ -830,6 +1114,19 @@ function CategoryContent({
       );
     case "account":
       return <AccountSettings profile={profile} />;
+    case "folders":
+      return (
+        <FolderManagementSettings
+          folders={folders}
+          notes={notes}
+          onCreateFolder={onCreateFolder}
+          onEditFolder={onEditFolder}
+          onDeleteFolder={onDeleteFolder}
+          onMoveFolder={onMoveFolder}
+          onMoveSystemFolder={onMoveSystemFolder}
+          unfiledPosition={unfiledPosition}
+        />
+      );
     case "appearance":
       return (
         <>
@@ -901,9 +1198,12 @@ function CategoryContent({
             <SettingSelect
               label="Font family"
               detail="Choose the voice of your notes."
-              value={values.font}
+              value={fontFamily}
               options={["DM Sans", "System default", "Georgia", "Monospace"]}
-              onChange={change("font")}
+              onChange={(value) => {
+                setValues((current) => ({ ...current, font: value }));
+                onFontFamilyChange(value);
+              }}
             />
             <SettingSelect
               label="Text size"
@@ -1080,22 +1380,55 @@ export function SettingsPage({
   dark,
   accent,
   onAccentChange,
+  fontFamily,
+  onFontFamilyChange,
   onToggleTheme,
   onClose,
   shortcuts,
   onShortcutsChange,
+  offlineMode,
+  onOfflineModeChange,
   storageMetrics,
   profile,
+  folders,
+  notes,
+  onCreateFolder,
+  onEditFolder,
+  onDeleteFolder,
+  onMoveFolder,
+  onMoveSystemFolder,
+  unfiledPosition,
 }: {
   dark: boolean;
   accent: AccentColor;
   onAccentChange: (value: AccentColor) => void;
+  fontFamily: string;
+  onFontFamilyChange: (value: string) => void;
   onToggleTheme: (value: boolean) => void;
   onClose: () => void;
   shortcuts: ShortcutBindings;
   onShortcutsChange: (value: ShortcutBindings) => void;
+  offlineMode: boolean;
+  onOfflineModeChange: (enabled: boolean) => void;
   storageMetrics: StorageMetrics;
   profile: AccountProfile;
+  folders: NoteFolder[];
+  notes: Note[];
+  onCreateFolder: (
+    name: string,
+    icon: NoteFolder["icon"],
+    color: NoteFolder["color"],
+  ) => boolean;
+  onEditFolder: (
+    currentId: string,
+    name: string,
+    icon: NoteFolder["icon"],
+    color: NoteFolder["color"],
+  ) => boolean;
+  onDeleteFolder: (id: string) => void;
+  onMoveFolder: (id: string, offset: -1 | 1) => void;
+  onMoveSystemFolder: (offset: -1 | 1) => void;
+  unfiledPosition: number;
 }) {
   const [categoryId, setCategoryId] = useState("general");
   const [query, setQuery] = useState("");
@@ -1264,10 +1597,22 @@ export function SettingsPage({
               setDark={onToggleTheme}
               accent={accent}
               onAccentChange={onAccentChange}
+              fontFamily={fontFamily}
+              onFontFamilyChange={onFontFamilyChange}
               shortcuts={shortcuts}
               onShortcutsChange={onShortcutsChange}
+              offlineMode={offlineMode}
+              onOfflineModeChange={onOfflineModeChange}
               storageMetrics={storageMetrics}
               profile={profile}
+              folders={folders}
+              notes={notes}
+              onCreateFolder={onCreateFolder}
+              onEditFolder={onEditFolder}
+              onDeleteFolder={onDeleteFolder}
+              onMoveFolder={onMoveFolder}
+              onMoveSystemFolder={onMoveSystemFolder}
+              unfiledPosition={unfiledPosition}
             />
           )}
         </div>

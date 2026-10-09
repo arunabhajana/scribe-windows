@@ -5,6 +5,7 @@ import { EditorPane } from "./components/editor/EditorPane";
 import { NotesPane } from "./components/notes/NotesPane";
 import { Sidebar } from "./components/layout/Sidebar";
 import { useNotes } from "./hooks/useNotes";
+import { notesRepository } from "./features/notes/notesRepository";
 import type { Note } from "./types/note";
 import { SettingsPage } from "./components/settings/SettingsPage";
 import { AuthPage } from "./components/auth/AuthPage";
@@ -26,9 +27,18 @@ import {
 type AppPage = "notes" | "preferences";
 
 function App() {
-  const notesState = useNotes();
   const auth = useAuth();
-  const [isDark, setIsDark] = useState(true);
+  const [offlineMode, setOfflineMode] = useState(
+    () => localStorage.getItem("scribe-offline-mode") === "true",
+  );
+  const notesState = useNotes(auth.user, auth.configured, offlineMode);
+  const [isDark, setIsDark] = useState(
+    () => localStorage.getItem("scribe-theme") !== "light",
+  );
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const [fontFamily, setFontFamily] = useState(
+    () => localStorage.getItem("scribe-font-family") ?? "DM Sans",
+  );
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isComposerModalActive, setIsComposerModalActive] = useState(false);
@@ -41,6 +51,28 @@ function App() {
   const [accent, setAccent] = useState<AccentColor>(
     () => (localStorage.getItem("scribe-accent") as AccentColor) || "violet",
   );
+
+  useEffect(() => {
+    let active = true;
+    if (!auth.user || !auth.configured)
+      return () => {
+        active = false;
+      };
+    if (offlineMode || !navigator.onLine)
+      return () => {
+        active = false;
+      };
+    void notesRepository
+      .loadProfileName(auth.user)
+      .then((name) => {
+        if (!active) return;
+        setProfileName(name);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [auth.user, auth.configured, offlineMode]);
 
   const storageMetrics = useMemo(() => {
     const bytes = (value: unknown) =>
@@ -67,6 +99,29 @@ function App() {
   const changeAccent = (value: AccentColor) => {
     setAccent(value);
     localStorage.setItem("scribe-accent", value);
+  };
+
+  const changeTheme = (dark: boolean) => {
+    setIsDark(dark);
+    localStorage.setItem("scribe-theme", dark ? "dark" : "light");
+  };
+
+  const changeFontFamily = (value: string) => {
+    setFontFamily(value);
+    localStorage.setItem("scribe-font-family", value);
+  };
+
+  const changeOfflineMode = (enabled: boolean) => {
+    setOfflineMode(enabled);
+    localStorage.setItem("scribe-offline-mode", String(enabled));
+  };
+
+  const fallbackProfile = auth.user
+    ? profileFromUser(auth.user)
+    : { displayName: "Scribe user", email: "" };
+  const accountProfile = {
+    ...fallbackProfile,
+    displayName: profileName ?? fallbackProfile.displayName,
   };
 
   const changeShortcuts = (value: ShortcutBindings) => {
@@ -145,19 +200,30 @@ function App() {
   ]);
 
   const handleDeleteNote = (note: Note) => {
-    if (note.trashed) {
+    if (note.deletedAt) {
       notesState.permanentlyDelete(note.id);
     } else {
       notesState.moveToTrash(note.id);
     }
     notesState.setSelectedId(null);
   };
+  const handleRestoreNote = (id: string) => {
+    notesState.restoreFromTrash(id);
+    notesState.selectSection("all");
+    notesState.setSelectedId(id);
+  };
 
   if (auth.loading)
     return (
       <div className={`desktop-frame ${isDark ? "theme-dark" : "theme-light"}`}>
-        <TitleBar dark={isDark} onToggleTheme={() => setIsDark((value) => !value)} />
-        <main className="auth-screen auth-loading" aria-label="Restoring session">
+        <TitleBar
+          dark={isDark}
+          onToggleTheme={() => setIsDark((value) => !value)}
+        />
+        <main
+          className="auth-screen auth-loading"
+          aria-label="Restoring session"
+        >
           <span className="auth-online-dot" />
           <span>Restoring your session…</span>
         </main>
@@ -175,10 +241,7 @@ function App() {
           } as React.CSSProperties
         }
       >
-        <TitleBar
-          dark={isDark}
-          onToggleTheme={() => setIsDark((value) => !value)}
-        />
+        <TitleBar dark={isDark} onToggleTheme={() => changeTheme(!isDark)} />
         <AuthPage
           configured={auth.configured}
           onSignIn={auth.signInWithPassword}
@@ -205,12 +268,26 @@ function App() {
           dark={isDark}
           accent={accent}
           onAccentChange={changeAccent}
-          onToggleTheme={setIsDark}
+          onToggleTheme={changeTheme}
+          fontFamily={fontFamily}
+          onFontFamilyChange={changeFontFamily}
           onClose={() => setPage("notes")}
           shortcuts={shortcuts}
           onShortcutsChange={changeShortcuts}
+          offlineMode={offlineMode}
+          onOfflineModeChange={changeOfflineMode}
           storageMetrics={storageMetrics}
-          profile={profileFromUser(auth.user)}
+          profile={accountProfile}
+          folders={notesState.folders}
+          unfiledPosition={notesState.unfiledPosition}
+          notes={notesState.notes}
+          onCreateFolder={notesState.createFolder}
+          onEditFolder={notesState.updateFolder}
+          onDeleteFolder={notesState.deleteFolder}
+          onMoveFolder={notesState.moveFolder}
+          onMoveSystemFolder={(offset) =>
+            notesState.moveFolder("system:unfiled", offset)
+          }
         />
       </div>
     );
@@ -228,10 +305,13 @@ function App() {
       <TooltipLayer />
       <TitleBar
         dark={isDark}
-        onToggleTheme={() => setIsDark((value) => !value)}
+        onToggleTheme={() => changeTheme(!isDark)}
         onOpenSettings={() => setPage("preferences")}
         inert={isComposerModalActive}
         settingsShortcut={formatShortcut(shortcuts.openSettings)}
+        syncStatus={notesState.syncStatus}
+        offlineMode={offlineMode}
+        onToggleOfflineMode={() => changeOfflineMode(!offlineMode)}
       />
       <div
         className={`app-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
@@ -240,23 +320,44 @@ function App() {
         <Sidebar
           section={notesState.section}
           folder={notesState.folder}
+          folderId={notesState.folderId}
           folders={notesState.folders}
-          noteCount={notesState.notes.filter((note) => !note.trashed).length}
+          unfiledPosition={notesState.unfiledPosition}
+          folderCounts={notesState.folders.reduce<Record<string, number>>(
+            (counts, folder) => {
+              counts[folder.id] = notesState.notes.filter(
+                (note) => !note.deletedAt && note.folderId === folder.id,
+              ).length;
+              return counts;
+            },
+            {},
+          )}
+          noteCount={notesState.notes.filter((note) => !note.deletedAt).length}
+          unfiledCount={
+            notesState.notes.filter(
+              (note) => !note.deletedAt && note.folderId === null,
+            ).length
+          }
+          draftCount={
+            notesState.notes.filter((note) => !note.deletedAt && note.isDraft)
+              .length
+          }
           search={notesState.search}
           onSearchChange={notesState.setSearch}
           onSelectSection={notesState.selectSection}
           onSelectFolder={notesState.selectFolder}
+          onReorderFolders={notesState.reorderFolders}
           onCreateFolder={() => setIsCreateFolderOpen(true)}
           onOpenPreferences={() => setPage("preferences")}
           onLogout={async () => {
             await auth.signOut();
-            notesState.resetDemoData();
+            notesState.clearUserData();
           }}
           collapsed={sidebarCollapsed}
           onToggleCollapsed={toggleSidebar}
           onExpandSidebar={() => setSidebarCollapsed(false)}
           shortcuts={shortcuts}
-          profile={profileFromUser(auth.user)}
+          profile={accountProfile}
         />
         <NotesPane
           notes={notesState.visibleNotes}
@@ -265,16 +366,26 @@ function App() {
           section={notesState.section}
           folder={notesState.folder}
           search={notesState.search}
+          onSaveDraft={(id) => notesState.updateNote(id, { isDraft: false })}
           onSelectNote={notesState.setSelectedId}
           onTogglePinned={notesState.togglePinned}
           onCreateNote={openNewNote}
           shortcuts={shortcuts}
+          syncStatus={notesState.syncStatus}
         />
         <EditorPane
           note={notesState.selectedNote}
+          folders={notesState.folders}
+          onMoveToFolder={(noteId, folderId) =>
+            notesState.updateNote(noteId, { folderId })
+          }
+          onCreateFolder={() => setIsCreateFolderOpen(true)}
+          onRestoreNote={handleRestoreNote}
           isTrash={notesState.section === "trash"}
           deleteLabel={
-            notesState.section === "trash" ? "Delete" : "Move to trash"
+            notesState.section === "trash"
+              ? "Delete permanently"
+              : "Move to trash"
           }
           onCreateNote={openNewNote}
           onUpdateNote={notesState.updateNote}
@@ -297,12 +408,32 @@ function App() {
             setIsComposerOpen(false);
             setIsComposerModalActive(false);
           }}
+          onDiscard={(draft) => {
+            notesState.createNote({ ...draft, isDraft: true });
+          }}
           onClose={() => {
             setIsComposerOpen(false);
             setIsComposerModalActive(false);
           }}
           onModalActiveChange={setIsComposerModalActive}
         />
+      )}
+      {notesState.error && (
+        <div className="sync-error" role="alert" key={notesState.error}>
+          <span>{notesState.error}</span>
+          <button
+            type="button"
+            aria-label="Dismiss database error"
+            onClick={() => notesState.clearError()}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {notesState.loading && (
+        <div className="sync-loading" role="status">
+          Loading your notes…
+        </div>
       )}
     </main>
   );

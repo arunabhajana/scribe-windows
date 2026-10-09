@@ -1,16 +1,19 @@
 export type Note = {
-  id: number;
+  id: string;
   title: string;
   body: string;
-  folder: string;
+  folderId: string | null;
   pinned: boolean;
-  updated: string;
-  trashed?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  /** Drafts remain drafts until the user explicitly saves them. */
+  isDraft: boolean;
 };
 
-export type NoteSection = "all" | "pinned" | "trash";
+export type NoteSection = "all" | "drafts" | "pinned" | "trash" | "unfiled";
 
-export type NotePatch = Partial<Omit<Note, "id">>;
+export type NotePatch = Partial<Omit<Note, "id" | "createdAt">>;
 
 export type FolderIconName =
   | "folder"
@@ -30,7 +33,19 @@ export type FolderColor =
   | "rose"
   | "cyan";
 export type NoteFolder = {
+  id: string;
   name: string;
   icon: FolderIconName;
   color: FolderColor;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SystemFolder = {
+  id: "system:unfiled";
+  name: "Unfiled";
+  icon: "folder";
+  color: "blue";
+  system: true;
 };

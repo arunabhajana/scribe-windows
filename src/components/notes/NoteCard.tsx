@@ -14,6 +14,20 @@ export function NoteCard({
   onSelect: () => void;
   onTogglePinned: () => void;
 }) {
+  const relativeTime = new Intl.RelativeTimeFormat(undefined, {
+    numeric: "auto",
+  });
+  const ageSeconds =
+    (new Date().getTime() - new Date(note.updatedAt).getTime()) / 1000;
+  const seconds = Math.max(0, Math.round(ageSeconds));
+  const updated =
+    seconds < 60
+      ? relativeTime.format(-seconds, "second")
+      : seconds < 3600
+        ? relativeTime.format(-Math.round(seconds / 60), "minute")
+        : seconds < 86400
+          ? relativeTime.format(-Math.round(seconds / 3600), "hour")
+          : relativeTime.format(-Math.round(seconds / 86400), "day");
   return (
     <article
       role="button"
@@ -45,14 +59,14 @@ export function NoteCard({
           .trim() || "No additional text"}
       </p>
       <div className="card-meta">
-        <span className="card-updated">{note.updated}</span>
-        {note.folder && (
+        <span className="card-updated">{updated}</span>
+        {note.folderId && (
           <span className="folder-chip-row">
             <span
               className={`folder-chip folder-chip-${folderConfig?.color ?? "violet"}`}
             >
               <span className="chip-dot" />
-              {note.folder}
+              {folderConfig?.name}
             </span>
           </span>
         )}

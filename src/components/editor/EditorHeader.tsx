@@ -1,54 +1,165 @@
-import type { Note } from "../../types/note";
+import { useState } from "react";
+import { ChevronDown, Folder, FolderPlus, RotateCcw } from "lucide-react";
+import type { Note, NoteFolder } from "../../types/note";
 import { Icon } from "../Icon";
 
 export function EditorHeader({
-    note,
-    onUpdateTitle,
-    onTogglePinned,
-    onDelete,
-    deleteLabel,
-    pinShortcut,
+  note,
+  onUpdateTitle,
+  onTogglePinned,
+  onDelete,
+  deleteLabel,
+  pinShortcut,
+  folders,
+  onMoveToFolder,
+  onCreateFolder,
+  onRestore,
 }: {
-    note: Note;
-    onUpdateTitle: (title: string) => void;
-    onTogglePinned: () => void;
-    onDelete: () => void;
-    deleteLabel: string;
-    pinShortcut: string;
+  note: Note;
+  onUpdateTitle: (title: string) => void;
+  onTogglePinned: () => void;
+  onDelete: () => void;
+  deleteLabel: string;
+  pinShortcut: string;
+  folders: NoteFolder[];
+  onMoveToFolder: (folderId: string | null) => void;
+  onCreateFolder: () => void;
+  onRestore: () => void;
 }) {
-    return (
-        <header className="editor-header">
-            <div className="editor-title-wrap">
-                <span className="editor-mobile-label">Editing</span>
-                <input
-                    className="note-title-input"
-                    value={note.title}
-                    onChange={(event) => onUpdateTitle(event.target.value)}
-                    aria-label="Note title"
+  const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+  const currentFolder = folders.find((folder) => folder.id === note.folderId);
+  return (
+    <header className="editor-header">
+      <div className="editor-title-wrap">
+        <span className="editor-mobile-label">Editing</span>
+        <input
+          className="note-title-input"
+          value={note.title}
+          onChange={(event) => onUpdateTitle(event.target.value)}
+          readOnly={Boolean(note.deletedAt)}
+          aria-label="Note title"
+        />
+      </div>
+      <div className="editor-actions">
+        {!note.deletedAt && (
+          <div className="editor-folder-picker">
+            <button
+              type="button"
+              className={`editor-folder-trigger ${folderMenuOpen ? "is-open" : ""}`}
+              aria-label={`Folder: ${currentFolder?.name ?? "No folder"}`}
+              aria-haspopup="listbox"
+              aria-expanded={folderMenuOpen}
+              data-tooltip="Change note folder"
+              onClick={() => setFolderMenuOpen((open) => !open)}
+            >
+              <Folder
+                size={14}
+                style={{
+                  color: currentFolder
+                    ? `var(--folder-${currentFolder.color})`
+                    : undefined,
+                }}
+              />
+              <span>{currentFolder?.name ?? "No folder"}</span>
+              <ChevronDown size={13} />
+            </button>
+            {folderMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="editor-folder-dismiss"
+                  aria-label="Close folder menu"
+                  onClick={() => setFolderMenuOpen(false)}
                 />
-            </div>
-            <div className="editor-actions">
-                <span className="save-status" data-tooltip="All changes are saved">
-                    <span className="save-dot" />
-                    Saved
-                </span>
-                <button
-                    className={`action-button ${note.pinned ? "pinned" : ""}`}
-                    onClick={onTogglePinned}
-                    data-tooltip={`${note.pinned ? "Unpin note" : "Pin note"} · ${pinShortcut}`}
+                <div
+                  className="editor-folder-menu"
+                  role="listbox"
+                  aria-label="Move note to folder"
                 >
-                    <Icon name="pin" size={15} />
-                    <span>{note.pinned ? "Pinned" : "Pin"}</span>
-                </button>
-                <button
-                    className="action-button delete-action"
-                    onClick={onDelete}
-                    data-tooltip={deleteLabel}
-                >
-                    <Icon name="trash" size={15} />
-                    <span>{deleteLabel}</span>
-                </button>
-            </div>
-        </header>
-    );
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={!note.folderId}
+                    className={!note.folderId ? "is-selected" : ""}
+                    onClick={() => {
+                      onMoveToFolder(null);
+                      setFolderMenuOpen(false);
+                    }}
+                  >
+                    No folder
+                  </button>
+                  {folders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      role="option"
+                      aria-selected={note.folderId === folder.id}
+                      className={
+                        note.folderId === folder.id ? "is-selected" : ""
+                      }
+                      onClick={() => {
+                        onMoveToFolder(folder.id);
+                        setFolderMenuOpen(false);
+                      }}
+                    >
+                      <span
+                        className="editor-folder-option-icon"
+                        style={{ color: `var(--folder-${folder.color})` }}
+                      >
+                        <Icon name={folder.icon} size={14} />
+                      </span>
+                      <span>{folder.name}</span>
+                    </button>
+                  ))}
+                  <span className="editor-folder-menu-divider" />
+                  <button
+                    type="button"
+                    className="editor-folder-create"
+                    onClick={() => {
+                      onCreateFolder();
+                      setFolderMenuOpen(false);
+                    }}
+                  >
+                    <FolderPlus size={14} /> Create folder
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        <span className="save-status" data-tooltip="All changes are saved">
+          <span className="save-dot" />
+          Saved
+        </span>
+        {!note.deletedAt && (
+          <button
+            className={`action-button ${note.pinned ? "pinned" : ""}`}
+            onClick={onTogglePinned}
+            data-tooltip={`${note.pinned ? "Unpin note" : "Pin note"} · ${pinShortcut}`}
+          >
+            <Icon name="pin" size={15} />
+            <span>{note.pinned ? "Pinned" : "Pin"}</span>
+          </button>
+        )}
+        {note.deletedAt && (
+          <button
+            className="action-button"
+            onClick={onRestore}
+            data-tooltip="Restore note"
+          >
+            <RotateCcw size={15} />
+            <span>Restore</span>
+          </button>
+        )}
+        <button
+          className="action-button delete-action"
+          onClick={onDelete}
+          data-tooltip={deleteLabel}
+        >
+          <Icon name="trash" size={15} />
+          <span>{deleteLabel}</span>
+        </button>
+      </div>
+    </header>
+  );
 }

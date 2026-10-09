@@ -12,12 +12,18 @@ import type { AccountProfile } from "../../features/auth/accountProfile";
 type SidebarProps = {
   section: NoteSection;
   folder: string;
+  folderId: string | null;
   folders: NoteFolder[];
+  unfiledPosition: number;
+  folderCounts: Record<string, number>;
   noteCount: number;
+  draftCount: number;
+  unfiledCount: number;
   search: string;
   onSearchChange: (value: string) => void;
   onSelectSection: (section: NoteSection) => void;
   onSelectFolder: (folder: string) => void;
+  onReorderFolders: (sourceId: string, targetId: string) => void;
   onCreateFolder: () => void;
   onOpenPreferences: () => void;
   onLogout: () => void;
@@ -47,14 +53,21 @@ export function Sidebar(props: SidebarProps) {
         <PrimaryNavigation
           section={props.section}
           noteCount={props.noteCount}
+          draftCount={props.draftCount}
           onSelect={props.onSelectSection}
           shortcuts={props.shortcuts}
         />
         <FolderNavigation
           folders={props.folders}
-          selectedFolder={props.folder}
+          unfiledPosition={props.unfiledPosition}
+          folderCounts={props.folderCounts}
+          unfiledCount={props.unfiledCount}
+          selectedFolder={
+            props.section === "unfiled" ? "system:unfiled" : props.folderId
+          }
           onSelectFolder={props.onSelectFolder}
           onCreateFolder={props.onCreateFolder}
+          onReorderFolders={props.onReorderFolders}
         />
       </div>
       <ProfileBar
