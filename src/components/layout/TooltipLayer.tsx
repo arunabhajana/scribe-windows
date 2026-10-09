@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type TooltipState = {
@@ -6,10 +6,41 @@ type TooltipState = {
   left: number;
   top: number;
   placement: "top" | "right";
+  target: Element;
 };
 
 export function TooltipLayer() {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const tooltipElement = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!tooltip || !tooltipElement.current) return;
+    const bounds = tooltipElement.current.getBoundingClientRect();
+    const safeGap = 8;
+    let next = tooltip;
+    if (tooltip.placement === "right" && tooltip.left + bounds.width > window.innerWidth - safeGap) {
+      const rect = tooltip.target?.getBoundingClientRect();
+      next = {
+        ...tooltip,
+        placement: "top",
+        left: rect ? rect.left + rect.width / 2 : tooltip.left,
+      };
+    }
+    if (next.placement === "top") {
+      next = {
+        ...next,
+        left: Math.max(bounds.width / 2 + safeGap, Math.min(window.innerWidth - bounds.width / 2 - safeGap, next.left)),
+        top: Math.max(bounds.height + safeGap, Math.min(window.innerHeight - safeGap, next.top)),
+      };
+    } else {
+      next = {
+        ...next,
+        left: Math.max(safeGap, Math.min(window.innerWidth - bounds.width - safeGap, next.left)),
+        top: Math.max(bounds.height / 2 + safeGap, Math.min(window.innerHeight - bounds.height / 2 - safeGap, next.top)),
+      };
+    }
+    if (next.left !== tooltip.left || next.top !== tooltip.top || next.placement !== tooltip.placement) setTooltip(next);
+  }, [tooltip]);
 
   useEffect(() => {
     let timer = 0;
@@ -21,26 +52,12 @@ export function TooltipLayer() {
         target.closest(".app-layout.sidebar-collapsed .sidebar") !== null;
       const toolbar = target.closest(".format-toolbar") !== null;
       const composerFooter = target.closest(".composer-footer") !== null;
-      const placement = collapsedSidebar ? "right" : "top";
-      const left =
-        placement === "right"
-          ? rect.right + 11
-          : Math.max(
-              14,
-              Math.min(window.innerWidth - 14, rect.left + rect.width / 2),
-            );
-      const top =
-        placement === "right"
-          ? Math.max(
-              48,
-              Math.min(window.innerHeight - 48, rect.top + rect.height / 2),
-            )
-          : Math.max(48, rect.top - (toolbar || composerFooter ? 12 : 10));
       setTooltip({
         text,
-        left,
-        top,
-        placement: toolbar || composerFooter ? "top" : placement,
+        target,
+        left: collapsedSidebar && rect.right + 131 <= window.innerWidth - 8 ? rect.right + 11 : rect.left + rect.width / 2,
+        top: Math.max(48, rect.top - (toolbar || composerFooter ? 12 : 10)),
+        placement: collapsedSidebar && rect.right + 131 <= window.innerWidth - 8 ? "right" : "top",
       });
     };
     const schedule = (event: Event) => {
@@ -81,6 +98,7 @@ export function TooltipLayer() {
   if (!tooltip) return null;
   return createPortal(
     <div
+      ref={tooltipElement}
       className={`app-tooltip app-tooltip-${tooltip.placement}`}
       style={{ left: tooltip.left, top: tooltip.top }}
     >

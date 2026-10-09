@@ -98,10 +98,10 @@ export function TitleBar({
               offlineMode ? "Turn off Offline Mode" : "Turn on Offline Mode"
             }
             aria-pressed={offlineMode}
-            title={
+            data-tooltip={
               offlineMode
-                ? "Offline Mode is on. Queue changes locally."
-                : "Offline Mode is off. Sync when changes are ready."
+                ? "Offline Mode is on · Changes stay on this device"
+                : "Offline Mode is off · Changes sync to your account"
             }
           >
             {offlineMode ? <WifiOff size={14} /> : <Wifi size={14} />}
@@ -112,7 +112,7 @@ export function TitleBar({
             className="titlebar-action theme-titlebar-action"
             onClick={onToggleTheme}
             aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
-            title={dark ? "Switch to light theme" : "Switch to dark theme"}
+            data-tooltip={dark ? "Switch to light theme" : "Switch to dark theme"}
           >
             {dark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
@@ -122,7 +122,7 @@ export function TitleBar({
             className="titlebar-action"
             onClick={onOpenSettings}
             aria-label="Open settings"
-            title={`Settings${settingsShortcut ? ` · ${settingsShortcut}` : ""}`}
+            data-tooltip={`Settings${settingsShortcut ? ` · ${settingsShortcut}` : ""}`}
           >
             <Settings2 size={14} />
           </button>

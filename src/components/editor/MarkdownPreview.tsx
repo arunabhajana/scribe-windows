@@ -21,16 +21,18 @@ function inlineMarkdown(escaped: string) {
 }
 
 function listItem(line: string) {
+  const task = line.match(/^\s*[-*+]\s+\[([ xX])\]\s+(.*)$/);
+  if (task) return { ordered: false, task: true, checked: task[1].toLowerCase() === "x", content: task[2] };
   const match = line.match(/^\s*(?:([-*+])\s*|(\d+)[.)]\s*)(.*)$/);
   if (!match) return null;
-  return { ordered: Boolean(match[2]), content: match[3] };
+  return { ordered: Boolean(match[2]), task: false, checked: false, content: match[3] };
 }
 
-function markdownToHtml(markdown: string) {
+function markdownToHtml(markdown: string, tasksInteractive: boolean) {
   const lines = escapeHtml(markdown).replace(/\r\n?/g, "\n").split("\n");
   const blocks: string[] = [];
   let paragraph: string[] = [];
-  let list: { type: "ul" | "ol"; items: string[] } | null = null;
+  let list: { type: "ul" | "ol" | "tasks"; items: Array<{ content: string; checked: boolean; line: number }> } | null = null;
   let code: string[] | null = null;
   const flushParagraph = () => {
     if (paragraph.length)
@@ -40,12 +42,16 @@ function markdownToHtml(markdown: string) {
   const flushList = () => {
     if (list)
       blocks.push(
-        `<${list.type}>${list.items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</${list.type}>`,
+        list.type === "tasks"
+          ? `<ul class="task-list">${list.items.map((item) => {
+              return `<li class="task-list-item${item.checked ? " is-checked" : ""}"><input class="task-checkbox" type="checkbox" data-task-line="${item.line}" aria-label="${item.checked ? "Mark incomplete" : "Mark complete"}: ${item.content}" ${tasksInteractive ? "" : "disabled"} ${item.checked ? "checked" : ""}><span class="task-content">${inlineMarkdown(item.content)}</span></li>`;
+            }).join("")}</ul>`
+          : `<${list.type}>${list.items.map((item) => `<li>${inlineMarkdown(item.content)}</li>`).join("")}</${list.type}>`,
       );
     list = null;
   };
 
-  for (const line of lines) {
+  for (const [lineIndex, line] of lines.entries()) {
     if (line.trim().startsWith("```")) {
       flushParagraph();
       flushList();
@@ -67,10 +73,10 @@ function markdownToHtml(markdown: string) {
     const item = listItem(line);
     if (item) {
       flushParagraph();
-      const type = item.ordered ? "ol" : "ul";
+      const type = item.task ? "tasks" : item.ordered ? "ol" : "ul";
       if (list && list.type !== type) flushList();
       list ??= { type, items: [] };
-      list.items.push(item.content);
+      list.items.push({ content: item.content, checked: item.checked, line: lineIndex });
       continue;
     }
     flushList();
@@ -95,7 +101,13 @@ function markdownToHtml(markdown: string) {
   return blocks.join("");
 }
 
-export function MarkdownPreview({ value }: { value: string }) {
+export function MarkdownPreview({
+  value,
+  onToggleTask,
+}: {
+  value: string;
+  onToggleTask?: (lineIndex: number) => void;
+}) {
   if (!value.trim())
     return (
       <div className="markdown-preview-empty">
@@ -105,7 +117,15 @@ export function MarkdownPreview({ value }: { value: string }) {
   return (
     <div
       className="markdown-preview"
-      dangerouslySetInnerHTML={{ __html: markdownToHtml(value) }}
+      dangerouslySetInnerHTML={{ __html: markdownToHtml(value, Boolean(onToggleTask)) }}
+      onChange={(event) => {
+        const checkbox = (event.target as HTMLElement).closest<HTMLInputElement>(
+          ".task-checkbox[data-task-line]",
+        );
+        if (!checkbox || !onToggleTask) return;
+        const lineIndex = Number(checkbox.dataset.taskLine);
+        if (Number.isInteger(lineIndex)) onToggleTask(lineIndex);
+      }}
     />
   );
 }

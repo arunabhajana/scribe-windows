@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { ChevronDown, Folder, FolderPlus, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Folder, FolderPlus, Pencil, RotateCcw } from "lucide-react";
 import type { Note, NoteFolder } from "../../types/note";
 import { Icon } from "../Icon";
 
 export function EditorHeader({
   note,
+  titleEditable,
   onUpdateTitle,
   onTogglePinned,
   onDelete,
@@ -16,6 +17,7 @@ export function EditorHeader({
   onRestore,
 }: {
   note: Note;
+  titleEditable: boolean;
   onUpdateTitle: (title: string) => void;
   onTogglePinned: () => void;
   onDelete: () => void;
@@ -27,18 +29,50 @@ export function EditorHeader({
   onRestore: () => void;
 }) {
   const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+  const [titleEditing, setTitleEditing] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    setTitleEditing(false);
+  }, [note.id]);
+  useEffect(() => {
+    if (titleEditing) titleInputRef.current?.focus();
+  }, [titleEditing]);
   const currentFolder = folders.find((folder) => folder.id === note.folderId);
   return (
     <header className="editor-header">
-      <div className="editor-title-wrap">
-        <span className="editor-mobile-label">Editing</span>
-        <input
-          className="note-title-input"
-          value={note.title}
-          onChange={(event) => onUpdateTitle(event.target.value)}
-          readOnly={Boolean(note.deletedAt)}
-          aria-label="Note title"
-        />
+      <div className={`editor-title-wrap ${titleEditing ? "is-editing" : ""}`}>
+        {titleEditing && titleEditable ? (
+          <input
+            ref={titleInputRef}
+            className="note-title-input"
+            value={note.title}
+            onChange={(event) => onUpdateTitle(event.target.value)}
+            onBlur={() => setTitleEditing(false)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === "Escape") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            aria-label="Note title"
+          />
+        ) : (
+          <button
+            type="button"
+            className={`editor-title-view ${titleEditable ? "is-clickable" : ""}`}
+            onClick={() => titleEditable && setTitleEditing(true)}
+            disabled={!titleEditable}
+            aria-label={titleEditable ? "Edit note title" : undefined}
+          >
+            <h1>{note.title || "Untitled note"}</h1>
+            {titleEditable && (
+              <span className="editor-edit-hint" aria-hidden="true">
+                <Pencil size={14} />
+                <span>Click to edit</span>
+              </span>
+            )}
+          </button>
+        )}
       </div>
       <div className="editor-actions">
         {!note.deletedAt && (

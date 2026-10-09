@@ -11,6 +11,7 @@ import {
     Database,
     Download,
     FileText,
+    FileClock,
     Folder,
     Heart,
     Info,
@@ -42,6 +43,7 @@ import type { LucideIcon } from "lucide-react";
 
 const iconMap = {
     note: FileText,
+    draft: FileClock,
     search: Search,
     pin: Pin,
     trash: Trash2,

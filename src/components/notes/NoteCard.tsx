@@ -1,5 +1,7 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import type { Note, NoteFolder } from "../../types/note";
 import { Icon } from "../Icon";
+import { MarkdownPreview } from "../editor/MarkdownPreview";
 
 export function NoteCard({
   note,
@@ -14,6 +16,56 @@ export function NoteCard({
   onSelect: () => void;
   onTogglePinned: () => void;
 }) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewOverflows, setPreviewOverflows] = useState(false);
+  useLayoutEffect(() => {
+    const previewElement = previewRef.current;
+    if (!previewElement) return;
+    const measureOverflow = () => {
+      const measurement = previewElement.cloneNode(true) as HTMLDivElement;
+      const markdown = measurement.firstElementChild as HTMLElement | null;
+      measurement.classList.remove("has-overflow");
+      Object.assign(measurement.style, {
+        position: "fixed",
+        left: "-10000px",
+        top: "0",
+        width: `${previewElement.clientWidth}px`,
+        height: "auto",
+        minHeight: "0",
+        maxHeight: "none",
+        overflow: "visible",
+        flex: "none",
+        visibility: "hidden",
+        pointerEvents: "none",
+      });
+      if (markdown) {
+        Object.assign(markdown.style, {
+          display: "block",
+          height: "auto",
+          maxHeight: "none",
+          overflow: "visible",
+          webkitLineClamp: "unset",
+          lineClamp: "unset",
+          webkitMaskImage: "none",
+          maskImage: "none",
+          fontWeight: "400",
+        });
+      }
+      previewElement.parentElement?.appendChild(measurement);
+      const overflows = measurement.scrollHeight > previewElement.clientHeight + 1;
+      measurement.remove();
+      setPreviewOverflows((previous) =>
+        previous === overflows ? previous : overflows,
+      );
+    };
+    measureOverflow();
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(previewElement);
+    if (previewElement.firstElementChild)
+      observer.observe(previewElement.firstElementChild);
+    return () => observer.disconnect();
+  }, [note.body]);
+
   const relativeTime = new Intl.RelativeTimeFormat(undefined, {
     numeric: "auto",
   });
@@ -32,9 +84,19 @@ export function NoteCard({
     <article
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest("button, input, a, select, textarea")) return;
+        onSelect();
+      }}
       onKeyDown={(event) => {
-        if (event.key === "Enter") onSelect();
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          event.target === event.currentTarget
+        ) {
+          event.preventDefault();
+          onSelect();
+        }
       }}
       className={`note-card ${selected ? "selected" : ""}`}
     >
@@ -52,12 +114,14 @@ export function NoteCard({
           <Icon name="pin" size={14} />
         </button>
       </div>
-      <p>
-        {note.body
-          .replace(/[#•\n]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim() || "No additional text"}
-      </p>
+      {note.body.trim() ? (
+        <div
+          ref={previewRef}
+          className={`note-card-preview ${previewOverflows ? "has-overflow" : ""}`}
+        >
+          <MarkdownPreview value={note.body} />
+        </div>
+      ) : <p className="note-card-empty">No additional text</p>}
       <div className="card-meta">
         <span className="card-updated">{updated}</span>
         {note.folderId && (

@@ -29,11 +29,12 @@ export function PrimaryNavigation({
                 <span className="nav-count">{noteCount}</span>
             </button>
             <button
+                data-tooltip={`Drafts · ${formatShortcut(shortcuts.drafts)}`}
                 aria-label={`Drafts, ${draftCount} notes`}
                 className={`nav-item ${section === "drafts" ? "active" : ""}`}
                 onClick={() => onSelect("drafts")}
             >
-                <Icon name="note" />
+                <Icon name="draft" />
                 <span>Drafts</span>
                 <span className="nav-count">{draftCount}</span>
             </button>

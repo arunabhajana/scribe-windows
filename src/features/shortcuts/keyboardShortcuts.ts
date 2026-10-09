@@ -6,6 +6,7 @@ export const shortcutActions = [
     label: "Show all notes",
     description: "Switch to All Notes.",
   },
+  { id: "drafts", label: "Show drafts", description: "Switch to Drafts." },
   {
     id: "pinnedNotes",
     label: "Show pinned notes",
@@ -37,8 +38,9 @@ export const defaultShortcutBindings: ShortcutBindings = {
   newNote: { key: "n", shift: false },
   search: { key: "k", shift: false },
   allNotes: { key: "1", shift: false },
-  pinnedNotes: { key: "2", shift: false },
-  trash: { key: "3", shift: false },
+  drafts: { key: "2", shift: false },
+  pinnedNotes: { key: "3", shift: false },
+  trash: { key: "4", shift: false },
   toggleSidebar: { key: "b", shift: true },
   togglePin: { key: "p", shift: true },
   openSettings: { key: ",", shift: false },
@@ -49,9 +51,17 @@ export function getShortcutBindings(): ShortcutBindings {
     const saved = localStorage.getItem("scribe-keyboard-shortcuts");
     if (!saved) return defaultShortcutBindings;
     const parsed = JSON.parse(saved) as Partial<ShortcutBindings>;
-    return Object.fromEntries(
+    const bindings = Object.fromEntries(
       shortcutActions.map(({ id }) => {
-        const binding = parsed[id];
+        let binding = parsed[id];
+        // Upgrade the previous built-in section shortcuts while preserving any
+        // custom bindings a user has already chosen in Settings.
+        if (id === "drafts" && binding?.key === "d" && binding.shift)
+          binding = defaultShortcutBindings.drafts;
+        if (id === "pinnedNotes" && binding?.key === "2" && !binding.shift)
+          binding = defaultShortcutBindings.pinnedNotes;
+        if (id === "trash" && binding?.key === "3" && !binding.shift)
+          binding = defaultShortcutBindings.trash;
         return [
           id,
           binding &&
@@ -62,6 +72,8 @@ export function getShortcutBindings(): ShortcutBindings {
         ];
       }),
     ) as ShortcutBindings;
+    localStorage.setItem("scribe-keyboard-shortcuts", JSON.stringify(bindings));
+    return bindings;
   } catch {
     return defaultShortcutBindings;
   }

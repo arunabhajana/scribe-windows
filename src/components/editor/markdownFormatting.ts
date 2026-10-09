@@ -61,6 +61,23 @@ export function applyMarkdownAction(
   let next: string;
   let selectionStart = start;
   let selectionEnd = end;
+  if (action === "todo") {
+    const prefixMatch = currentLine.match(/^(\s*)(?:[-*+]\s+\[([ xX])\]\s+|[-*+]\s+)?(.*)$/);
+    if (!prefixMatch) return;
+    const indent = prefixMatch[1];
+    const checked = prefixMatch[2];
+    const body = prefixMatch[3];
+    const replacement = checked === undefined ? `${indent}- [ ] ${body}` : `${indent}${body}`;
+    next = `${value.slice(0, lineStart)}${replacement}${value.slice(lineEnd)}`;
+    selectionStart = lineStart + indent.length + (checked === undefined ? 6 : 0);
+    selectionEnd = lineStart + replacement.length;
+    onChange(next);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(selectionStart, selectionEnd);
+    });
+    return;
+  }
 
   if (["heading1", "heading2", "bullet", "number", "quote"].includes(action)) {
     const marker =
@@ -70,9 +87,9 @@ export function applyMarkdownAction(
           ? "## "
           : action === "bullet"
             ? "- "
-            : action === "number"
-              ? "1. "
-              : "> ";
+          : action === "number"
+            ? "1. "
+            : "> ";
     const existing =
       currentLine.match(/^(#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s+)/)?.[0] ?? "";
     const content = existing ? currentLine.slice(existing.length) : currentLine;

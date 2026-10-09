@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { Note } from "../../types/note";
 import type { NoteFolder } from "../../types/note";
 import { EmptyEditor } from "./EmptyEditor";
@@ -47,8 +47,11 @@ export function EditorPane({
   onCreateFolder,
   onRestoreNote,
 }: EditorPaneProps) {
-  const [preview, setPreview] = useState(false);
+  const [bodyEditing, setBodyEditing] = useState(false);
   const bodyInputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    setBodyEditing(false);
+  }, [note?.id]);
   const applyAction = (action: MarkdownAction) =>
     applyMarkdownAction(
       bodyInputRef.current,
@@ -91,6 +94,7 @@ export function EditorPane({
     <section className="editor-pane">
       <EditorHeader
         note={note}
+        titleEditable={!isTrash}
         onUpdateTitle={(title) => onUpdateNote(note.id, { title })}
         onTogglePinned={() => onUpdateNote(note.id, { pinned: !note.pinned })}
         onDelete={() => onDeleteNote(note)}
@@ -101,19 +105,21 @@ export function EditorPane({
         onCreateFolder={onCreateFolder}
         onRestore={() => onRestoreNote(note.id)}
       />
-      <EditorToolbar
-        preview={preview}
-        onTogglePreview={() => setPreview((value) => !value)}
-        onAction={applyAction}
-        disabled={isTrash}
-      />
+      {bodyEditing && !isTrash && (
+        <EditorToolbar
+          preview={false}
+          onTogglePreview={() => setBodyEditing(false)}
+          onAction={applyAction}
+        />
+      )}
       <NoteBodyEditor
         value={note.body}
-        preview={preview}
+        preview={!bodyEditing}
         inputRef={bodyInputRef}
         onChange={(body) => onUpdateNote(note.id, { body })}
         onKeyDown={handleFormattingKeyDown}
         readOnly={isTrash}
+        onBeginEdit={() => setBodyEditing(true)}
       />
       <EditorFooter body={note.body} />
     </section>

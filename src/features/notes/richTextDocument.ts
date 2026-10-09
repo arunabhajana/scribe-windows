@@ -13,6 +13,10 @@ export type RichTextNode =
       type: "bulletList" | "orderedList";
       content: Array<{ type: "listItem"; content: RichTextNode[] }>;
     }
+  | {
+      type: "taskList";
+      content: Array<{ type: "taskItem"; attrs: { checked: boolean }; content: RichTextNode[] }>;
+    }
   | { type: "blockquote"; content: RichTextNode[] }
   | { type: "codeBlock"; content: Array<{ type: "text"; text: string }> }
   /** Used only to preserve Markdown content during the text-to-JSONB migration. */
@@ -95,6 +99,22 @@ export function markdownToDocument(markdown: string): RichTextDocument {
         content: parseInline(heading[2]),
       });
       i++;
+      continue;
+    }
+    const taskItem = lines[i].match(/^\s*[-*+]\s+\[([ xX])\]\s+(.*)$/);
+    if (taskItem) {
+      const items: Array<{ type: "taskItem"; attrs: { checked: boolean }; content: RichTextNode[] }> = [];
+      while (i < lines.length) {
+        const match = lines[i].match(/^\s*[-*+]\s+\[([ xX])\]\s+(.*)$/);
+        if (!match) break;
+        items.push({
+          type: "taskItem",
+          attrs: { checked: match[1].toLowerCase() === "x" },
+          content: [{ type: "paragraph", content: parseInline(match[2]) }],
+        });
+        i++;
+      }
+      content.push({ type: "taskList", content: items });
       continue;
     }
     const listItem = lines[i].match(/^\s*([-*+] |\d+\. )/);
@@ -201,6 +221,10 @@ export function documentToMarkdown(value: unknown): string {
             (item, index) =>
               `${node.type === "bulletList" ? "- " : `${index + 1}. `}${item.content.map((child) => (child.type === "paragraph" ? inlineToMarkdown(child.content) : "")).join("")}`,
           )
+          .join("\n");
+      if (node.type === "taskList")
+        return node.content
+          .map((item) => `- [${item.attrs.checked ? "x" : " "}] ${item.content.map((child) => (child.type === "paragraph" ? inlineToMarkdown(child.content) : "")).join("")}`)
           .join("\n");
       return "";
     })

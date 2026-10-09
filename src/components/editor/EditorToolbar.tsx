@@ -1,6 +1,7 @@
 import {
   Bold,
   Code2,
+  CheckSquare,
   Eye,
   EyeOff,
   Heading1,
@@ -24,6 +25,7 @@ export type MarkdownAction =
   | "heading2"
   | "bullet"
   | "number"
+  | "todo"
   | "quote"
   | "code"
   | "link";
@@ -90,6 +92,7 @@ export function EditorToolbar({
       <div className="format-group">
         {button("Bulleted list", "bullet", <List size={16} />)}
         {button("Numbered list", "number", <ListOrdered size={16} />)}
+        {button("To-do list", "todo", <CheckSquare size={16} />)}
       </div>
       <span className="toolbar-divider" />
       <div className="format-group">

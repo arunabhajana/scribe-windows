@@ -20,6 +20,7 @@ import type {
 
 const makeId = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
+const TEXT_SYNC_DEBOUNCE_MS = 1_500;
 const folderOrderStorageKey = (userId: string) =>
   `scribe-folder-order:${userId}`;
 const unfiledOrderStorageKey = (userId: string) =>
@@ -269,9 +270,16 @@ export function useNotes(
         );
         if (resolved) {
           setNotes((items) =>
-            items.map((item) => (item.id === note.id ? saved : item)),
+            items.map((item) =>
+              item.id === note.id ? { ...saved, body: item.body } : item,
+            ),
           );
-          await offlineStore.cacheNote(owner.id, saved);
+          await offlineStore.cacheNote(owner.id, {
+            ...saved,
+            body:
+              notesRef.current.find((item) => item.id === note.id)?.body ??
+              note.body,
+          });
         }
         return;
       }
@@ -652,7 +660,7 @@ export function useNotes(
           setTimeout(() => {
             setOutboxRevision((revision) => revision + 1);
             flushOutboxRef.current();
-          }, 650),
+          }, TEXT_SYNC_DEBOUNCE_MS),
         );
       } else {
         flushOutboxRef.current();

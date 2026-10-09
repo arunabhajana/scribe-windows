@@ -172,6 +172,9 @@ function App() {
         case "pinnedNotes":
           notesState.selectSection("pinned");
           break;
+        case "drafts":
+          notesState.selectSection("drafts");
+          break;
         case "trash":
           notesState.selectSection("trash");
           break;
